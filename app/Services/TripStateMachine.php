@@ -39,6 +39,15 @@ final class TripStateMachine
         return in_array($to->value, self::TRANSITIONS[$from->value] ?? [], true);
     }
 
+    /** @return list<TripStatus> */
+    public function allowedTargets(TripStatus $from): array
+    {
+        return array_values(array_map(
+            static fn (string $value): TripStatus => TripStatus::from($value),
+            self::TRANSITIONS[$from->value] ?? []
+        ));
+    }
+
     public function transition(
         Trip $trip,
         TripStatus $to,
