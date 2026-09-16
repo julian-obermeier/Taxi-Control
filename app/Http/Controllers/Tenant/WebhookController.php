@@ -9,6 +9,7 @@ use App\Models\WebhookDelivery;
 use App\Services\AuditService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -29,7 +30,7 @@ class WebhookController extends Controller
     {
         $data = $this->validated($request);
         $secret = Str::random(48);
-        $webhook = Webhook::query()->create([...$data, 'secret_hash' => $secret, 'is_active' => true]);
+        $webhook = Webhook::query()->create([...$data, 'secret_hash' => Crypt::encryptString($secret), 'is_active' => true]);
         $this->audit->log('tenant.webhook.created', $webhook, [], ['name' => $webhook->name, 'endpoint' => $webhook->endpoint], [], $tenant->id);
         return back()->with('status', 'Webhook wurde angelegt. Das Signatur-Secret wird nur jetzt angezeigt.')->with('webhook_secret', $secret);
     }
@@ -48,7 +49,7 @@ class WebhookController extends Controller
         abort_unless($webhook->tenant_id === $tenant->id, 404);
         $payload = ['event' => 'system.test', 'tenant_id' => $tenant->id, 'timestamp' => now()->toIso8601String()];
         $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        $signature = hash_hmac('sha256', $json, $webhook->secret_hash);
+        $signature = hash_hmac('sha256', $json, Crypt::decryptString($webhook->secret_hash));
         $delivery = WebhookDelivery::query()->create(['webhook_id' => $webhook->id, 'event' => 'system.test', 'status' => 'sending', 'payload' => $payload, 'attempt' => 1]);
         try {
             $response = Http::timeout(8)->acceptJson()->withHeaders(['X-Taxi-Control-Signature' => 'sha256='.$signature, 'X-Taxi-Control-Event' => 'system.test'])->withBody($json, 'application/json')->post($webhook->endpoint);

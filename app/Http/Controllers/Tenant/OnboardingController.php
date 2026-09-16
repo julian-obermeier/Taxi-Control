@@ -50,7 +50,7 @@ class OnboardingController extends Controller
         return [
             'Unternehmensname vorhanden' => filled($tenant->name),
             'Aktiver Eigentümer vorhanden' => (bool) $owner,
-            'Eigentümer mit 2FA abgesichert' => (bool) ($owner?->two_factor_confirmed_at),
+            'Eigentümer mit 2FA abgesichert' => (bool) ($owner?->two_factor_enabled_at),
             'SaaS-Paket zugeordnet' => Subscription::query()->whereIn('status', ['trial', 'active'])->exists(),
             'Kontakt-E-Mail gepflegt' => filled($settings['company_email'] ?? $tenant->billing_email),
             'Unternehmensort gepflegt' => filled($settings['city'] ?? null) && filled($settings['postal_code'] ?? null),

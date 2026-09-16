@@ -24,18 +24,12 @@ class UserController extends Controller
     {
         $tenant = $this->context->requireTenant();
         $users = $tenant->users()->orderBy('users.name')->paginate(25);
-
         return view('tenant.users.index', compact('tenant', 'users'));
     }
 
     public function create(): View
     {
-        return view('tenant.users.form', [
-            'tenant' => $this->context->requireTenant(),
-            'member' => null,
-            'roles' => Role::query()->orderBy('name')->get(),
-            'selectedRoles' => [],
-        ]);
+        return view('tenant.users.form', ['tenant' => $this->context->requireTenant(), 'member' => null, 'roles' => Role::query()->orderBy('name')->get(), 'selectedRoles' => []]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -47,8 +41,8 @@ class UserController extends Controller
             'password' => ['nullable', 'string', 'min:12'],
             'roles' => ['array'],
             'roles.*' => ['integer'],
+            'is_owner' => ['nullable', 'boolean'],
         ]);
-
         $roleIds = array_values(array_unique($data['roles'] ?? []));
         abort_unless(Role::query()->whereKey($roleIds)->count() === count($roleIds), 422, 'Mindestens eine Rolle gehört nicht zu diesem Mandanten.');
 
@@ -56,24 +50,16 @@ class UserController extends Controller
             $user = User::query()->where('email', Str::lower($data['email']))->first();
             if (! $user) {
                 abort_if(empty($data['password']), 422, 'Für ein neues Benutzerkonto ist ein Passwort erforderlich.');
-                $user = User::query()->create([
-                    'name' => $data['name'],
-                    'email' => Str::lower($data['email']),
-                    'password' => $data['password'],
-                ]);
+                $user = User::query()->create(['name' => $data['name'], 'email' => Str::lower($data['email']), 'password' => $data['password']]);
             }
-
             DB::table('tenant_user')->updateOrInsert(
                 ['tenant_id' => $tenant->id, 'user_id' => $user->id],
-                ['status' => 'active', 'is_owner' => false, 'updated_at' => now(), 'created_at' => now()]
+                ['status' => 'active', 'is_owner' => (bool) ($data['is_owner'] ?? false), 'updated_at' => now(), 'created_at' => now()]
             );
-
             $this->syncRoles($tenant->id, $user->id, $roleIds);
             return $user;
         });
-
-        $this->audit->log('tenant.user.added', $user, [], ['user_id' => $user->id, 'roles' => $roleIds]);
-
+        $this->audit->log('tenant.user.added', $user, [], ['user_id' => $user->id, 'roles' => $roleIds, 'is_owner' => (bool) ($data['is_owner'] ?? false)]);
         return redirect()->route('taxi-control.tenant.users.index', ['tenant' => $tenant->slug])->with('status', 'Benutzer wurde dem Mandanten zugeordnet.');
     }
 
@@ -82,13 +68,7 @@ class UserController extends Controller
         $tenant = $this->context->requireTenant();
         $member = $tenant->users()->where('users.id', $user)->firstOrFail();
         $selectedRoles = DB::table('role_user')->where('tenant_id', $tenant->id)->where('user_id', $member->id)->pluck('role_id')->all();
-
-        return view('tenant.users.form', [
-            'tenant' => $tenant,
-            'member' => $member,
-            'roles' => Role::query()->orderBy('name')->get(),
-            'selectedRoles' => $selectedRoles,
-        ]);
+        return view('tenant.users.form', ['tenant' => $tenant, 'member' => $member, 'roles' => Role::query()->orderBy('name')->get(), 'selectedRoles' => $selectedRoles]);
     }
 
     public function update(Request $request, int $user): RedirectResponse
@@ -99,16 +79,21 @@ class UserController extends Controller
             'status' => ['required', Rule::in(['active', 'inactive'])],
             'roles' => ['array'],
             'roles.*' => ['integer'],
+            'is_owner' => ['nullable', 'boolean'],
         ]);
         $roleIds = array_values(array_unique($data['roles'] ?? []));
         abort_unless(Role::query()->whereKey($roleIds)->count() === count($roleIds), 422, 'Mindestens eine Rolle gehört nicht zu diesem Mandanten.');
-
-        DB::transaction(function () use ($tenant, $member, $data, $roleIds): void {
-            DB::table('tenant_user')->where('tenant_id', $tenant->id)->where('user_id', $member->id)->update(['status' => $data['status'], 'updated_at' => now()]);
+        $wasOwner = (bool) $member->pivot->is_owner;
+        $newOwner = (bool) ($data['is_owner'] ?? false);
+        if ($wasOwner && ! $newOwner) {
+            $otherOwners = DB::table('tenant_user')->where('tenant_id', $tenant->id)->where('is_owner', true)->where('user_id', '!=', $member->id)->count();
+            abort_if($otherOwners === 0, 422, 'Der letzte Eigentümer des Mandanten kann nicht entfernt werden.');
+        }
+        DB::transaction(function () use ($tenant, $member, $data, $roleIds, $newOwner): void {
+            DB::table('tenant_user')->where('tenant_id', $tenant->id)->where('user_id', $member->id)->update(['status' => $data['status'], 'is_owner' => $newOwner, 'updated_at' => now()]);
             $this->syncRoles($tenant->id, $member->id, $roleIds);
         });
-
-        $this->audit->log('tenant.user.updated', $member, [], ['status' => $data['status'], 'roles' => $roleIds]);
+        $this->audit->log('tenant.user.updated', $member, [], ['status' => $data['status'], 'roles' => $roleIds, 'is_owner' => $newOwner]);
         return back()->with('status', 'Benutzerzuordnung wurde gespeichert.');
     }
 
@@ -116,13 +101,15 @@ class UserController extends Controller
     {
         $tenant = $this->context->requireTenant();
         $member = $tenant->users()->where('users.id', $user)->firstOrFail();
-
+        if ((bool) $member->pivot->is_owner) {
+            $otherOwners = DB::table('tenant_user')->where('tenant_id', $tenant->id)->where('is_owner', true)->where('user_id', '!=', $member->id)->count();
+            abort_if($otherOwners === 0, 422, 'Der letzte Eigentümer des Mandanten kann nicht entfernt werden.');
+        }
         DB::transaction(function () use ($tenant, $member): void {
             DB::table('role_user')->where('tenant_id', $tenant->id)->where('user_id', $member->id)->delete();
             DB::table('user_permission_overrides')->where('tenant_id', $tenant->id)->where('user_id', $member->id)->delete();
             DB::table('tenant_user')->where('tenant_id', $tenant->id)->where('user_id', $member->id)->delete();
         });
-
         $this->audit->log('tenant.user.removed', $member, ['user_id' => $member->id], []);
         return redirect()->route('taxi-control.tenant.users.index', ['tenant' => $tenant->slug])->with('status', 'Benutzer wurde aus diesem Mandanten entfernt. Das globale Konto bleibt erhalten.');
     }
@@ -130,15 +117,7 @@ class UserController extends Controller
     private function syncRoles(int $tenantId, int $userId, array $roleIds): void
     {
         DB::table('role_user')->where('tenant_id', $tenantId)->where('user_id', $userId)->delete();
-        if ($roleIds === []) {
-            return;
-        }
-        DB::table('role_user')->insert(array_map(fn (int $roleId) => [
-            'tenant_id' => $tenantId,
-            'role_id' => $roleId,
-            'user_id' => $userId,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ], $roleIds));
+        if ($roleIds === []) return;
+        DB::table('role_user')->insert(array_map(fn (int $roleId) => ['tenant_id' => $tenantId, 'role_id' => $roleId, 'user_id' => $userId, 'created_at' => now(), 'updated_at' => now()], $roleIds));
     }
 }
