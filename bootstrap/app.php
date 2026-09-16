@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureSuperadmin;
 use App\Http\Middleware\EnsureTenantMembership;
+use App\Http\Middleware\EnsureTwoFactorVerified;
 use App\Http\Middleware\ResolveTenant;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -19,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant.resolve' => ResolveTenant::class,
             'tenant.member' => EnsureTenantMembership::class,
             'superadmin' => EnsureSuperadmin::class,
+            '2fa' => EnsureTwoFactorVerified::class,
         ]);
 
         $middleware->validateCsrfTokens(except: [
@@ -26,5 +28,5 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        // Zentrale Exception-Konfiguration folgt dem Fail-Closed-Prinzip.
+        // Fail-closed: Fachliche Fehler werden über die jeweiligen Handler/HTTP-Statuscodes transportiert.
     })->create();
