@@ -15,8 +15,11 @@ Die Abnahme basiert auf dem verbindlichen Taxi-Control-Masterprompt und dem CI-L
 - zentraler Mandantenkontext über `TenantContext`
 - fail-closed Mandantenscope für tenantgebundene Modelle
 - Schutz vor nachträglichem Wechsel einer `tenant_id`
-- Mandantenslugs und Pfadrouting `/taxi-control/{tenant}`
-- separater Superadmin-Bereich `/taxi-control/superadmin`
+- Mandantenslugs und Pfadrouting direkt über `/{tenant}`
+- separater Superadmin-Bereich `/superadmin`
+- Login unter `/login`
+- reservierte Systempfade können nicht als Mandanten-Slug vergeben werden
+- Kompatibilitätsweiterleitungen von alten `/taxi-control/...`-GET-URLs
 - Login und TOTP-2FA
 - Superadministrator, Mandantenmitgliedschaften und serverseitige Zugriffskontrollen
 - mehrere Rollen pro Benutzer
@@ -119,6 +122,7 @@ Automatisiert geprüft werden insbesondere:
 - API-Key-Authentifizierung
 - API-Scope-Prüfung
 - API-Sperre für deaktivierte Mandanten
+- Domain-Root-URL-Erzeugung und Legacy-Redirects
 
 ## 5. Buttons und Bedienpfade
 
