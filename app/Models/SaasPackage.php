@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SaasPackage extends Model
 {
@@ -16,5 +18,16 @@ class SaasPackage extends Model
             'is_active' => 'boolean',
             'limits' => 'array',
         ];
+    }
+
+    public function features(): BelongsToMany
+    {
+        return $this->belongsToMany(Feature::class, 'feature_saas_package')
+            ->withPivot(['enabled', 'limit_value']);
+    }
+
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(Subscription::class);
     }
 }

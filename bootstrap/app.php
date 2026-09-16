@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AuthenticateApiClient;
 use App\Http\Middleware\EnsureSuperadmin;
 use App\Http\Middleware\EnsureTenantMembership;
 use App\Http\Middleware\EnsureTwoFactorVerified;
@@ -23,8 +24,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'superadmin' => EnsureSuperadmin::class,
             '2fa' => EnsureTwoFactorVerified::class,
             'permission' => RequirePermission::class,
+            'api.client' => AuthenticateApiClient::class,
         ]);
-
         $middleware->validateCsrfTokens(except: ['api/*']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
