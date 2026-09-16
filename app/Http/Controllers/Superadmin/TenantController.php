@@ -7,8 +7,8 @@ use App\Models\SaasPackage;
 use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Services\AuditService;
+use App\Services\SubscriptionService;
 use App\Services\TenantProvisioningService;
-use App\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +20,7 @@ class TenantController extends Controller
 {
     public function __construct(
         private readonly TenantProvisioningService $provisioning,
-        private readonly TenantContext $context,
+        private readonly SubscriptionService $subscriptions,
         private readonly AuditService $audit,
     ) {
     }
@@ -31,7 +31,6 @@ class TenantController extends Controller
         if ($search = trim((string) $request->query('q'))) {
             $query->where(fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%"));
         }
-
         return view('superadmin.tenants.index', ['tenants' => $query->paginate(20)->withQueryString()]);
     }
 
@@ -40,42 +39,34 @@ class TenantController extends Controller
         return view('superadmin.tenants.form', [
             'tenant' => new Tenant(['timezone' => 'Europe/Berlin', 'locale' => 'de', 'status' => 'trial']),
             'packages' => SaasPackage::query()->where('is_active', true)->orderBy('name')->get(),
+            'subscription' => null,
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
         $data = $this->validated($request);
-        $packageId = $data['saas_package_id'] ?? null;
-        unset($data['saas_package_id']);
+        $packageId = isset($data['saas_package_id']) ? (int) $data['saas_package_id'] : null;
+        $billingCycle = $data['billing_cycle'];
+        unset($data['saas_package_id'], $data['billing_cycle']);
         $data['slug'] = Str::slug($data['slug'] ?: $data['name']);
 
-        $tenant = DB::transaction(function () use ($data, $packageId): Tenant {
+        $tenant = DB::transaction(function () use ($data, $packageId, $billingCycle): Tenant {
             $tenant = Tenant::query()->create($data);
             $this->provisioning->provisionDefaults($tenant);
-
             if ($packageId) {
-                $this->context->run($tenant, fn () => Subscription::query()->create([
-                    'saas_package_id' => $packageId,
-                    'status' => 'trial',
-                    'starts_at' => now(),
-                    'trial_ends_at' => now()->addDays(14),
-                    'billing_cycle' => 'monthly',
-                ]));
+                $this->subscriptions->assign($tenant, $packageId, $billingCycle);
             }
-
             return $tenant;
         });
 
-        $this->audit->log('superadmin.tenant.created', $tenant, [], $tenant->only(['name', 'slug', 'status']), [], $tenant->id);
-
+        $this->audit->log('superadmin.tenant.created', $tenant, [], $tenant->only(['name', 'slug', 'status']), ['package_id' => $packageId], $tenant->id);
         return redirect()->route('taxi-control.superadmin.tenants.edit', $tenant)->with('status', 'Mandant wurde angelegt und mit Standardrollen provisioniert.');
     }
 
     public function edit(Tenant $tenant): View
     {
-        $subscription = Subscription::query()->withoutGlobalScopes()->where('tenant_id', $tenant->id)->latest()->first();
-
+        $subscription = Subscription::query()->withoutGlobalScopes()->where('tenant_id', $tenant->id)->latest('id')->first();
         return view('superadmin.tenants.form', [
             'tenant' => $tenant,
             'subscription' => $subscription,
@@ -87,31 +78,18 @@ class TenantController extends Controller
     {
         $before = $tenant->only(['name', 'legal_name', 'slug', 'status', 'billing_email', 'timezone']);
         $data = $this->validated($request, $tenant);
-        $packageId = $data['saas_package_id'] ?? null;
-        unset($data['saas_package_id']);
+        $packageId = isset($data['saas_package_id']) ? (int) $data['saas_package_id'] : null;
+        $billingCycle = $data['billing_cycle'];
+        unset($data['saas_package_id'], $data['billing_cycle']);
         $data['slug'] = Str::slug($data['slug'] ?: $data['name']);
-        $tenant->update($data);
 
-        $this->context->run($tenant, function () use ($packageId): void {
-            $subscription = Subscription::query()->latest()->first();
-            if ($packageId) {
-                if ($subscription) {
-                    $subscription->update(['saas_package_id' => $packageId]);
-                } else {
-                    Subscription::query()->create([
-                        'saas_package_id' => $packageId,
-                        'status' => 'trial',
-                        'starts_at' => now(),
-                        'trial_ends_at' => now()->addDays(14),
-                        'billing_cycle' => 'monthly',
-                    ]);
-                }
-            }
+        DB::transaction(function () use ($tenant, $data, $packageId, $billingCycle): void {
+            $tenant->update($data);
+            $this->subscriptions->assign($tenant, $packageId, $billingCycle);
         });
 
-        $this->audit->log('superadmin.tenant.updated', $tenant, $before, $tenant->only(array_keys($before)), [], $tenant->id);
-
-        return back()->with('status', 'Mandant wurde gespeichert.');
+        $this->audit->log('superadmin.tenant.updated', $tenant, $before, $tenant->fresh()->only(array_keys($before)), ['package_id' => $packageId, 'billing_cycle' => $billingCycle], $tenant->id);
+        return back()->with('status', 'Mandant und Abonnement wurden gespeichert.');
     }
 
     public function destroy(Request $request, Tenant $tenant): RedirectResponse
@@ -120,7 +98,6 @@ class TenantController extends Controller
         $snapshot = $tenant->only(['id', 'name', 'slug']);
         $tenant->delete();
         $this->audit->log('superadmin.tenant.deleted', null, $snapshot, [], ['deleted_tenant_id' => $snapshot['id']]);
-
         return redirect()->route('taxi-control.superadmin.tenants.index')->with('status', 'Mandant wurde gelöscht.');
     }
 
@@ -134,7 +111,8 @@ class TenantController extends Controller
             'billing_email' => ['nullable', 'email', 'max:255'],
             'timezone' => ['required', Rule::in(['Europe/Berlin'])],
             'locale' => ['required', Rule::in(['de'])],
-            'saas_package_id' => ['nullable', 'integer', 'exists:saas_packages,id'],
+            'saas_package_id' => ['nullable', 'integer', Rule::exists('saas_packages', 'id')->where('is_active', true)],
+            'billing_cycle' => ['required', Rule::in(['monthly', 'yearly'])],
         ]);
     }
 }
