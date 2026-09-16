@@ -28,7 +28,6 @@ jobs:
         run: |
           cp .env.example .env
           touch database/database.sqlite
-          php artisan key:generate --force
       - name: Database and seed smoke test
         run: php artisan migrate:fresh --seed --force
       - name: Route smoke test
@@ -76,9 +75,7 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
       - name: Prepare environment
-        run: |
-          cp .env.example .env
-          php artisan key:generate --force
+        run: cp .env.example .env
       - name: MySQL migration and seed smoke test
         run: php artisan migrate:fresh --seed --force
       - name: Route cache smoke test
