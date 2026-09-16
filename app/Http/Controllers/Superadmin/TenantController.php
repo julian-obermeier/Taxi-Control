@@ -14,10 +14,25 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class TenantController extends Controller
 {
+    private const RESERVED_SLUGS = [
+        'login',
+        'logout',
+        'install',
+        'superadmin',
+        'account',
+        '2fa',
+        'api',
+        'up',
+        'assets',
+        'storage',
+        'taxi-control',
+    ];
+
     public function __construct(
         private readonly TenantProvisioningService $provisioning,
         private readonly SubscriptionService $subscriptions,
@@ -49,7 +64,7 @@ class TenantController extends Controller
         $packageId = isset($data['saas_package_id']) ? (int) $data['saas_package_id'] : null;
         $billingCycle = $data['billing_cycle'];
         unset($data['saas_package_id'], $data['billing_cycle']);
-        $data['slug'] = Str::slug($data['slug'] ?: $data['name']);
+        $data['slug'] = $this->validatedSlug($data);
 
         $tenant = DB::transaction(function () use ($data, $packageId, $billingCycle): Tenant {
             $tenant = Tenant::query()->create($data);
@@ -81,7 +96,7 @@ class TenantController extends Controller
         $packageId = isset($data['saas_package_id']) ? (int) $data['saas_package_id'] : null;
         $billingCycle = $data['billing_cycle'];
         unset($data['saas_package_id'], $data['billing_cycle']);
-        $data['slug'] = Str::slug($data['slug'] ?: $data['name']);
+        $data['slug'] = $this->validatedSlug($data, $tenant);
 
         DB::transaction(function () use ($tenant, $data, $packageId, $billingCycle): void {
             $tenant->update($data);
@@ -114,5 +129,23 @@ class TenantController extends Controller
             'saas_package_id' => ['nullable', 'integer', Rule::exists('saas_packages', 'id')->where('is_active', true)],
             'billing_cycle' => ['required', Rule::in(['monthly', 'yearly'])],
         ]);
+    }
+
+    private function validatedSlug(array $data, ?Tenant $tenant = null): string
+    {
+        $slug = Str::slug((string) ($data['slug'] ?: $data['name']));
+
+        if ($slug === '' || in_array($slug, self::RESERVED_SLUGS, true)) {
+            throw ValidationException::withMessages([
+                'slug' => 'Dieser Mandantenpfad ist für Taxi-Control reserviert. Bitte wählen Sie einen anderen Slug.',
+            ]);
+        }
+
+        validator(
+            ['slug' => $slug],
+            ['slug' => ['required', 'max:100', Rule::unique('tenants', 'slug')->ignore($tenant?->id)]],
+        )->validate();
+
+        return $slug;
     }
 }
