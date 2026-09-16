@@ -11,6 +11,9 @@ jobs:
     strategy:
       matrix:
         php: ['8.2', '8.3']
+    env:
+      DB_CONNECTION: sqlite
+      DB_DATABASE: database/database.sqlite
     steps:
       - uses: actions/checkout@v4
       - name: Setup PHP
@@ -24,6 +27,7 @@ jobs:
       - name: Prepare environment
         run: |
           cp .env.example .env
+          touch database/database.sqlite
           php artisan key:generate
       - name: Database and seed smoke test
         run: php artisan migrate:fresh --seed --force
