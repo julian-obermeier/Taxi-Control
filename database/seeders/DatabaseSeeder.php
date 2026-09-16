@@ -38,12 +38,30 @@ class DatabaseSeeder extends Seeder
             ['module' => 'privacy', 'action' => 'update', 'label' => 'Datenschutzvorgänge bearbeiten'],
             ['module' => 'onboarding', 'action' => 'view', 'label' => 'Onboarding ansehen'],
             ['module' => 'onboarding', 'action' => 'update', 'label' => 'Onboarding bearbeiten'],
+            ['module' => 'dispatch', 'action' => 'view', 'label' => 'Disposition ansehen'],
+            ['module' => 'dispatch', 'action' => 'create', 'label' => 'Fahrten anlegen'],
+            ['module' => 'dispatch', 'action' => 'update', 'label' => 'Fahrten bearbeiten'],
+            ['module' => 'dispatch', 'action' => 'assign', 'label' => 'Fahrer und Fahrzeuge zuweisen'],
+            ['module' => 'dispatch', 'action' => 'status', 'label' => 'Fahrtstatus ändern'],
+            ['module' => 'dispatch', 'action' => 'delete', 'label' => 'Fahrten löschen'],
+            ['module' => 'drivers', 'action' => 'view', 'label' => 'Fahrer ansehen'],
+            ['module' => 'drivers', 'action' => 'create', 'label' => 'Fahrer anlegen'],
+            ['module' => 'drivers', 'action' => 'update', 'label' => 'Fahrer bearbeiten'],
+            ['module' => 'drivers', 'action' => 'delete', 'label' => 'Fahrer löschen'],
+            ['module' => 'drivers', 'action' => 'location', 'label' => 'Fahrerpositionen verarbeiten'],
+            ['module' => 'vehicles', 'action' => 'view', 'label' => 'Fahrzeuge ansehen'],
+            ['module' => 'vehicles', 'action' => 'create', 'label' => 'Fahrzeuge anlegen'],
+            ['module' => 'vehicles', 'action' => 'update', 'label' => 'Fahrzeuge bearbeiten'],
+            ['module' => 'vehicles', 'action' => 'delete', 'label' => 'Fahrzeuge löschen'],
+            ['module' => 'driver_portal', 'action' => 'view', 'label' => 'Eigenes Fahrerportal öffnen', 'data_scope' => 'own'],
+            ['module' => 'driver_portal', 'action' => 'update', 'label' => 'Eigene Aufträge bearbeiten', 'data_scope' => 'own'],
+            ['module' => 'driver_portal', 'action' => 'location', 'label' => 'Eigene Position übermitteln', 'data_scope' => 'own'],
         ];
 
         foreach ($permissions as $permission) {
             Permission::query()->updateOrCreate(
                 ['key' => $permission['module'].'.'.$permission['action']],
-                [...$permission, 'data_scope' => 'tenant']
+                [...$permission, 'data_scope' => $permission['data_scope'] ?? 'tenant']
             );
         }
 
