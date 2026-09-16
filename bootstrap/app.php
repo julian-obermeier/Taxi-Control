@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureSuperadmin;
 use App\Http\Middleware\EnsureTenantMembership;
 use App\Http\Middleware\EnsureTwoFactorVerified;
+use App\Http\Middleware\RequirePermission;
 use App\Http\Middleware\ResolveTenant;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -21,11 +22,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant.member' => EnsureTenantMembership::class,
             'superadmin' => EnsureSuperadmin::class,
             '2fa' => EnsureTwoFactorVerified::class,
+            'permission' => RequirePermission::class,
         ]);
 
-        $middleware->validateCsrfTokens(except: [
-            'api/*',
-        ]);
+        $middleware->validateCsrfTokens(except: ['api/*']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Fail-closed: Fachliche Fehler werden über die jeweiligen Handler/HTTP-Statuscodes transportiert.
