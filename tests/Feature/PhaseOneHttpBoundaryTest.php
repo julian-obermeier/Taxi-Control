@@ -114,6 +114,12 @@ class PhaseOneHttpBoundaryTest extends TestCase
             'two_factor_secret' => app(TotpService::class)->generateSecret(),
             'two_factor_enabled_at' => now(),
         ]);
+        $tenant = Tenant::query()->create([
+            'name' => 'Taxi 2FA',
+            'slug' => 'taxi-2fa',
+            'status' => 'active',
+        ]);
+        $tenant->users()->attach($user->id, ['status' => 'active', 'is_owner' => true]);
 
         $this->actingAs($user)
             ->get(route('taxi-control.home'))
@@ -122,6 +128,6 @@ class PhaseOneHttpBoundaryTest extends TestCase
         $this->withSession(['2fa_passed' => true])
             ->actingAs($user)
             ->get(route('taxi-control.home'))
-            ->assertOk();
+            ->assertRedirect(route('taxi-control.tenant.dashboard', ['tenant' => $tenant->slug]));
     }
 }
