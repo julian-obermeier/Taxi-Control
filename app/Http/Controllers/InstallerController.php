@@ -17,7 +17,6 @@ class InstallerController extends Controller
     public function show(): View
     {
         abort_if($this->installed(), 404);
-
         return view('installer.index', ['checks' => $this->checks()]);
     }
 
@@ -58,11 +57,14 @@ class InstallerController extends Controller
                 'database.connections.mysql.database' => $data['db_database'],
                 'database.connections.mysql.username' => $data['db_username'],
                 'database.connections.mysql.password' => $data['db_password'] ?? '',
+                'session.driver' => 'file',
+                'cache.default' => 'file',
             ]);
 
             DB::purge('mysql');
             DB::connection('mysql')->getPdo();
             Artisan::call('migrate', ['--force' => true]);
+            Artisan::call('db:seed', ['--force' => true]);
 
             $admin = User::query()->create([
                 'name' => $data['admin_name'],
@@ -72,8 +74,7 @@ class InstallerController extends Controller
                 'email_verified_at' => now(),
             ]);
 
-            $lockPath = storage_path('app/installed.lock');
-            file_put_contents($lockPath, json_encode([
+            file_put_contents(storage_path('app/installed.lock'), json_encode([
                 'installed_at' => now()->toIso8601String(),
                 'version' => '0.1.0-phase1',
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), LOCK_EX);
@@ -115,36 +116,11 @@ class InstallerController extends Controller
         $q = fn ($value) => '"'.str_replace(['\\', '"', "\n", "\r"], ['\\\\', '\\"', '', ''], (string) $value).'"';
 
         return implode("\n", [
-            'APP_NAME="Taxi-Control"',
-            'APP_ENV=production',
-            'APP_KEY='.$appKey,
-            'APP_DEBUG=false',
-            'APP_URL='.$q($data['app_url']),
-            'APP_TIMEZONE=Europe/Berlin',
-            'APP_LOCALE=de',
-            'APP_FALLBACK_LOCALE=de',
-            '',
-            'LOG_CHANNEL=stack',
-            'LOG_LEVEL=warning',
-            '',
-            'DB_CONNECTION=mysql',
-            'DB_HOST='.$q($data['db_host']),
-            'DB_PORT='.$data['db_port'],
-            'DB_DATABASE='.$q($data['db_database']),
-            'DB_USERNAME='.$q($data['db_username']),
-            'DB_PASSWORD='.$q($data['db_password'] ?? ''),
-            '',
-            'SESSION_DRIVER=database',
-            'SESSION_LIFETIME=120',
-            'SESSION_ENCRYPT=true',
-            'SESSION_SECURE_COOKIE=true',
-            'CACHE_STORE=database',
-            'QUEUE_CONNECTION=database',
-            '',
-            'MAIL_MAILER=log',
-            'MAIL_FROM_ADDRESS="noreply@example.de"',
-            'MAIL_FROM_NAME="Taxi-Control"',
-            '',
+            'APP_NAME="Taxi-Control"', 'APP_ENV=production', 'APP_KEY='.$appKey, 'APP_DEBUG=false', 'APP_URL='.$q($data['app_url']),
+            'APP_TIMEZONE=Europe/Berlin', 'APP_LOCALE=de', 'APP_FALLBACK_LOCALE=de', '', 'LOG_CHANNEL=stack', 'LOG_LEVEL=warning', '',
+            'DB_CONNECTION=mysql', 'DB_HOST='.$q($data['db_host']), 'DB_PORT='.$data['db_port'], 'DB_DATABASE='.$q($data['db_database']), 'DB_USERNAME='.$q($data['db_username']), 'DB_PASSWORD='.$q($data['db_password'] ?? ''), '',
+            'SESSION_DRIVER=database', 'SESSION_LIFETIME=120', 'SESSION_ENCRYPT=true', 'SESSION_SECURE_COOKIE=true', 'CACHE_STORE=database', 'QUEUE_CONNECTION=database', '',
+            'MAIL_MAILER=log', 'MAIL_FROM_ADDRESS="noreply@example.de"', 'MAIL_FROM_NAME="Taxi-Control"', '',
         ]);
     }
 }
