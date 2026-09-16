@@ -10,6 +10,7 @@ use App\Http\Middleware\ResolveTenant;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -28,6 +29,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'feature' => EnsureFeatureEnabled::class,
             'api.client' => AuthenticateApiClient::class,
         ]);
+
+        // Taxi-Control lives below /taxi-control; Laravel's default guest
+        // redirect expects a route named "login", while our scoped route is
+        // "taxi-control.login". Keep the redirect explicit so protected
+        // tenant/superadmin routes never fail with Route [login] not defined.
+        $middleware->redirectGuestsTo(fn (Request $request): string => route('taxi-control.login'));
+
         $middleware->validateCsrfTokens(except: ['api/*']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
