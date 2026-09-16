@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Superadmin\DashboardController;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'superadmin.dashboard')->name('dashboard');
+Route::get('/', DashboardController::class)->name('dashboard');
