@@ -41,7 +41,15 @@ final class FeatureService
         }
 
         $subscription = Subscription::query()
-            ->whereIn('status', ['trial', 'active'])
+            ->where(function ($query): void {
+                $query->where('status', 'active')
+                    ->orWhere(function ($trial): void {
+                        $trial->where('status', 'trial')
+                            ->where(function ($expiry): void {
+                                $expiry->whereNull('trial_ends_at')->orWhere('trial_ends_at', '>', now());
+                            });
+                    });
+            })
             ->where(function ($query): void {
                 $query->whereNull('starts_at')->orWhere('starts_at', '<=', now());
             })
