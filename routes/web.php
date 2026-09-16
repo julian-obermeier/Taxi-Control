@@ -7,6 +7,7 @@ use App\Http\Controllers\InstallerController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/taxi-control');
+Route::redirect('/install', '/taxi-control/install');
 
 Route::prefix('taxi-control')->name('taxi-control.')->group(function (): void {
     Route::get('/install', [InstallerController::class, 'show'])->name('install');
