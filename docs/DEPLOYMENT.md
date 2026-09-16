@@ -18,9 +18,21 @@ Der GitHub-Workflow **Build Shared Hosting Package** erzeugt ein ZIP inklusive `
 3. ZIP im gewünschten Hosting-Verzeichnis entpacken.
 4. Domain/Document Root auf `<projekt>/public` zeigen lassen.
 5. HTTPS aktivieren.
-6. `/taxi-control/install` im Browser öffnen.
+6. `/install` im Browser öffnen.
 7. Datenbank- und Superadmin-Daten eingeben.
 8. Installation abschließen und unmittelbar 2FA aktivieren.
+
+## Produktive URL-Struktur
+
+Taxi-Control läuft auf einer dedizierten Domain direkt auf der Domainwurzel. Der frühere feste Prefix `/taxi-control` wird nicht mehr für neue Links verwendet.
+
+- Login: `/login`
+- Superadmin: `/superadmin`
+- Mandant: `/{tenantSlug}`
+- Installer: `/install`
+- API: `/api/v1/...`
+
+Alte GET-Links unter `/taxi-control/...` werden permanent auf die entsprechende Root-URL weitergeleitet.
 
 ## Updates
 
