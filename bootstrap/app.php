@@ -30,10 +30,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'api.client' => AuthenticateApiClient::class,
         ]);
 
-        // Taxi-Control lives below /taxi-control; Laravel's default guest
-        // redirect expects a route named "login", while our scoped route is
-        // "taxi-control.login". Keep the redirect explicit so protected
-        // tenant/superadmin routes never fail with Route [login] not defined.
+        // Keep the explicit named redirect so protected tenant and
+        // superadmin routes always send guests to the application login.
         $middleware->redirectGuestsTo(fn (Request $request): string => route('taxi-control.login'));
 
         $middleware->validateCsrfTokens(except: ['api/*']);
