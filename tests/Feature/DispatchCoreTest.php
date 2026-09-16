@@ -51,9 +51,11 @@ class DispatchCoreTest extends TestCase
             $trip = $machine->transition($trip, TripStatus::ReadyForDispatch, source: 'test');
 
             $this->assertSame(TripStatus::ReadyForDispatch, $trip->status);
-            $this->assertCount(2, $trip->stateEvents()->get());
-            $this->assertSame('new', $trip->stateEvents()->latest('id')->first()->from_status);
-            $this->assertSame('ready_for_dispatch', $trip->stateEvents()->latest('id')->first()->to_status);
+
+            $events = $trip->stateEvents()->get();
+            $this->assertCount(2, $events);
+            $this->assertSame(['draft', 'new'], $events->pluck('from_status')->all());
+            $this->assertSame(['new', 'ready_for_dispatch'], $events->pluck('to_status')->all());
 
             $this->expectException(ValidationException::class);
             $machine->transition($trip, TripStatus::Completed, source: 'test');
