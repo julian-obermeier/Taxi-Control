@@ -1,0 +1,32 @@
+name: Build Shared Hosting Package
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, dom, fileinfo, zip
+          coverage: none
+      - name: Install production dependencies
+        run: composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+      - name: Prepare deployment tree
+        run: |
+          mkdir -p build/taxi-control
+          rsync -a --exclude='.git' --exclude='.github' --exclude='tests' --exclude='build' --exclude='.env' ./ build/taxi-control/
+          cd build
+          zip -qr taxi-control-shared-hosting.zip taxi-control
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: taxi-control-shared-hosting
+          path: build/taxi-control-shared-hosting.zip
+          retention-days: 30
