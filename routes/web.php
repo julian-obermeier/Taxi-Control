@@ -4,12 +4,12 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InstallerController;
+use App\Http\Controllers\LegacyRouteRedirectController;
 use Illuminate\Support\Facades\Route;
 
 // Compatibility for links from the former /taxi-control prefix.
-Route::get('/taxi-control/{path?}', function (?string $path = null) {
-    return redirect()->to(url('/'.ltrim($path ?? '', '/')), 301);
-})->where('path', '.*');
+Route::get('/taxi-control/{path?}', LegacyRouteRedirectController::class)
+    ->where('path', '.*');
 
 Route::name('taxi-control.')->group(function (): void {
     Route::get('/install', [InstallerController::class, 'show'])->name('install');
