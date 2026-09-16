@@ -21,8 +21,10 @@ if (! is_file($envPath) && is_file($examplePath)) {
 
 $envContents = is_file($envPath) ? @file_get_contents($envPath) : false;
 $configuredKey = null;
+$appKeyLinePattern = '/^[ \t]*APP_KEY[ \t]*=[ \t]*([^\r\n]*)$/m';
+$appKeyReplacePattern = '/^[ \t]*APP_KEY[ \t]*=[^\r\n]*$/m';
 
-if (is_string($envContents) && preg_match('/^\s*APP_KEY\s*=\s*(.*)$/m', $envContents, $matches) === 1) {
+if (is_string($envContents) && preg_match($appKeyLinePattern, $envContents, $matches) === 1) {
     $configuredKey = trim($matches[1]);
     $configuredKey = trim($configuredKey, "\"'");
 }
@@ -51,8 +53,8 @@ if ($configuredKey === null || $configuredKey === '') {
         $envContents = "APP_KEY=\nSESSION_DRIVER=file\nCACHE_STORE=file\n";
     }
 
-    if (preg_match('/^\s*APP_KEY\s*=.*$/m', $envContents) === 1) {
-        $updatedEnv = preg_replace('/^\s*APP_KEY\s*=.*$/m', 'APP_KEY='.$temporaryKey, $envContents, 1);
+    if (preg_match($appKeyReplacePattern, $envContents) === 1) {
+        $updatedEnv = preg_replace($appKeyReplacePattern, 'APP_KEY='.$temporaryKey, $envContents, 1);
     } else {
         $updatedEnv = "APP_KEY={$temporaryKey}\n".$envContents;
     }
