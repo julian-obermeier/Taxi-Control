@@ -7,6 +7,7 @@ use App\Models\Tenant;
 use App\Models\Webhook;
 use App\Models\WebhookDelivery;
 use App\Services\AuditService;
+use App\Services\OutboundUrlGuard;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -17,7 +18,7 @@ use Illuminate\View\View;
 
 class WebhookController extends Controller
 {
-    public function __construct(private readonly AuditService $audit)
+    public function __construct(private readonly AuditService $audit, private readonly OutboundUrlGuard $urlGuard)
     {
     }
 
@@ -29,6 +30,7 @@ class WebhookController extends Controller
     public function store(Request $request, Tenant $tenant): RedirectResponse
     {
         $data = $this->validated($request);
+        $this->urlGuard->validateHttps($data['endpoint']);
         $secret = Str::random(48);
         $webhook = Webhook::query()->create([...$data, 'secret_hash' => Crypt::encryptString($secret), 'is_active' => true]);
         $this->audit->log('tenant.webhook.created', $webhook, [], ['name' => $webhook->name, 'endpoint' => $webhook->endpoint], [], $tenant->id);
@@ -39,21 +41,32 @@ class WebhookController extends Controller
     {
         abort_unless($webhook->tenant_id === $tenant->id, 404);
         $data = $this->validated($request);
+        $this->urlGuard->validateHttps($data['endpoint']);
         $data['is_active'] = $request->boolean('is_active');
         $webhook->update($data);
+        $this->audit->log('tenant.webhook.updated', $webhook, [], ['name' => $webhook->name, 'endpoint' => $webhook->endpoint, 'is_active' => $webhook->is_active], [], $tenant->id);
         return back()->with('status', 'Webhook wurde gespeichert.');
     }
 
     public function test(Tenant $tenant, Webhook $webhook): RedirectResponse
     {
         abort_unless($webhook->tenant_id === $tenant->id, 404);
+        abort_unless($webhook->is_active, 422, 'Inaktive Webhooks können nicht getestet werden.');
+        $this->urlGuard->validateHttps($webhook->endpoint);
+
         $payload = ['event' => 'system.test', 'tenant_id' => $tenant->id, 'timestamp' => now()->toIso8601String()];
-        $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         $signature = hash_hmac('sha256', $json, Crypt::decryptString($webhook->secret_hash));
         $delivery = WebhookDelivery::query()->create(['webhook_id' => $webhook->id, 'event' => 'system.test', 'status' => 'sending', 'payload' => $payload, 'attempt' => 1]);
         try {
-            $response = Http::timeout(8)->acceptJson()->withHeaders(['X-Taxi-Control-Signature' => 'sha256='.$signature, 'X-Taxi-Control-Event' => 'system.test'])->withBody($json, 'application/json')->post($webhook->endpoint);
-            $delivery->update(['status' => $response->successful() ? 'delivered' : 'failed', 'http_status' => $response->status(), 'response_excerpt' => Str::limit($response->body(), 1000), 'delivered_at' => $response->successful() ? now() : null]);
+            $response = Http::timeout(8)
+                ->connectTimeout(4)
+                ->acceptJson()
+                ->withOptions(['allow_redirects' => false])
+                ->withHeaders(['X-Taxi-Control-Signature' => 'sha256='.$signature, 'X-Taxi-Control-Event' => 'system.test'])
+                ->withBody($json, 'application/json')
+                ->post($webhook->endpoint);
+            $delivery->update(['status' => $response->successful() ? 'delivered' : 'failed', 'http_status' => $response->status(), 'response_excerpt' => Str::limit($response->body(), 1000), 'delivered_at' => $response->successful() ? now() : null, 'next_retry_at' => $response->successful() ? null : now()->addMinutes(5)]);
         } catch (\Throwable $e) {
             $delivery->update(['status' => 'failed', 'response_excerpt' => Str::limit($e->getMessage(), 1000), 'next_retry_at' => now()->addMinutes(5)]);
         }
@@ -64,6 +77,7 @@ class WebhookController extends Controller
     {
         abort_unless($webhook->tenant_id === $tenant->id, 404);
         $webhook->delete();
+        $this->audit->log('tenant.webhook.deleted', null, ['id' => $webhook->id, 'name' => $webhook->name], [], [], $tenant->id);
         return back()->with('status', 'Webhook wurde gelöscht.');
     }
 
