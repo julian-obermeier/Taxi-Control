@@ -1,0 +1,7 @@
+@extends('layouts.app', ['title' => 'Benutzer', 'heading' => 'Benutzerverwaltung', 'eyebrow' => $tenant->name, 'tenant' => $tenant])
+@section('content')
+<div class="toolbar"><div><p class="muted">Benutzerkonten sind global; die Mitgliedschaft, Rollen und Rechte gelten ausschließlich für diesen Mandanten.</p></div><a class="btn btn-primary" href="{{ route('taxi-control.tenant.users.create', ['tenant' => $tenant->slug]) }}">Benutzer hinzufügen</a></div>
+<section class="panel top-gap"><div class="table-wrap"><table><thead><tr><th>Name</th><th>E-Mail</th><th>Status</th><th>Rollen</th><th></th></tr></thead><tbody>
+@forelse($users as $member)<tr><td><strong>{{ $member->name }}</strong></td><td>{{ $member->email }}</td><td><span class="status-pill {{ $member->pivot->status === 'active' ? 'success' : 'warning' }}">{{ $member->pivot->status === 'active' ? 'Aktiv' : 'Inaktiv' }}</span></td><td>{{ implode(', ', \Illuminate\Support\Facades\DB::table('role_user')->join('roles','roles.id','=','role_user.role_id')->where('role_user.tenant_id',$tenant->id)->where('role_user.user_id',$member->id)->pluck('roles.name')->all()) ?: '–' }}</td><td><a class="btn btn-small" href="{{ route('taxi-control.tenant.users.edit', ['tenant'=>$tenant->slug,'user'=>$member->id]) }}">Bearbeiten</a></td></tr>@empty<tr><td colspan="5"><div class="empty-state"><strong>Noch keine Benutzer zugeordnet.</strong></div></td></tr>@endforelse
+</tbody></table></div><div class="pagination">{{ $users->links() }}</div></section>
+@endsection
