@@ -10,7 +10,7 @@ class RootRoutingTest extends TestCase
     {
         $this->assertSame('/login', route('taxi-control.login', absolute: false));
         $this->assertSame('/superadmin', route('taxi-control.superadmin.dashboard', absolute: false));
-        $this->assertSame('/taxi-mueller', route('taxi-control.tenant.dashboard', ['tenant' => 'taxi-mueller'], false));
+        $this->assertSame('/taxi-mueller/dashboard', route('taxi-control.tenant.dashboard', ['tenant' => 'taxi-mueller'], false));
     }
 
     public function test_legacy_prefix_redirects_to_root(): void
