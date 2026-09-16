@@ -12,8 +12,22 @@
         @if(auth()->user()->is_superadmin)
             <a class="nav-link" href="{{ route('taxi-control.superadmin.dashboard') }}">SaaS-Control-Center</a>
             <a class="nav-link" href="{{ route('taxi-control.superadmin.tenants.index') }}">Mandanten</a>
+            <a class="nav-link" href="{{ route('taxi-control.superadmin.packages.index') }}">Pakete</a>
+            <a class="nav-link" href="{{ route('taxi-control.superadmin.features.index') }}">Feature-Flags</a>
+            <a class="nav-link" href="{{ route('taxi-control.superadmin.settings.index') }}">Globale Einstellungen</a>
+            <a class="nav-link" href="{{ route('taxi-control.superadmin.update.index') }}">Update-Center</a>
         @endif
-        @isset($tenant)<a class="nav-link" href="{{ route('taxi-control.tenant.dashboard', ['tenant' => $tenant->slug]) }}">Dashboard</a>@endisset
+        @isset($tenant)
+            <a class="nav-link" href="{{ route('taxi-control.tenant.dashboard', ['tenant' => $tenant->slug]) }}">Dashboard</a>
+            <a class="nav-link" href="{{ route('taxi-control.tenant.users.index', ['tenant' => $tenant->slug]) }}">Benutzer</a>
+            <a class="nav-link" href="{{ route('taxi-control.tenant.roles.index', ['tenant' => $tenant->slug]) }}">Rollen & Rechte</a>
+            <a class="nav-link" href="{{ route('taxi-control.tenant.settings.index', ['tenant' => $tenant->slug]) }}">Einstellungen</a>
+            <a class="nav-link" href="{{ route('taxi-control.tenant.onboarding.index', ['tenant' => $tenant->slug]) }}">Onboarding / Go-Live</a>
+            <a class="nav-link" href="{{ route('taxi-control.tenant.api.index', ['tenant' => $tenant->slug]) }}">API</a>
+            <a class="nav-link" href="{{ route('taxi-control.tenant.webhooks.index', ['tenant' => $tenant->slug]) }}">Webhooks</a>
+            <a class="nav-link" href="{{ route('taxi-control.tenant.privacy.index', ['tenant' => $tenant->slug]) }}">Datenschutz</a>
+            <a class="nav-link" href="{{ route('taxi-control.tenant.audit.index', ['tenant' => $tenant->slug]) }}">Audit</a>
+        @endisset
         <a class="nav-link" href="{{ route('taxi-control.account.2fa') }}">Sicherheit / 2FA</a>
     </nav>
     <div class="sidebar-footer"><div class="user-card"><strong>{{ auth()->user()->name }}</strong><small>{{ auth()->user()->email }}</small></div><form method="post" action="{{ route('taxi-control.logout') }}">@csrf<button class="btn btn-ghost btn-block" type="submit">Abmelden</button></form></div>
