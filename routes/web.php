@@ -6,10 +6,12 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InstallerController;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/taxi-control');
-Route::redirect('/install', '/taxi-control/install');
+// Compatibility for links from the former /taxi-control prefix.
+Route::get('/taxi-control/{path?}', function (?string $path = null) {
+    return redirect()->to(url('/'.ltrim($path ?? '', '/')), 301);
+})->where('path', '.*');
 
-Route::prefix('taxi-control')->name('taxi-control.')->group(function (): void {
+Route::name('taxi-control.')->group(function (): void {
     Route::get('/install', [InstallerController::class, 'show'])->name('install');
     Route::post('/install', [InstallerController::class, 'install'])->name('install.store');
 
