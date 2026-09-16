@@ -14,6 +14,10 @@ Taxi-Control ist eine mandantenfähige Taxi-Dispatch-SaaS-Plattform auf Laravel-
 
 ## Entwicklungsstatus
 
-Phase 1 – Fundament & SaaS-Kern: **in Umsetzung**.
+- **Phase 1 – Fundament & SaaS-Kern: abgeschlossen**
+- Phase 2 – Disposition & Fahrerbetrieb: als Nächstes
+- Phase 3 – CRM, Portale & Kommunikation: ausstehend
+- Phase 4 – Abrechnung, Personal, Fuhrpark & Spezialmodule: ausstehend
+- Phase 5 – Vollendung und Release 1.0: ausstehend
 
-Die detaillierte Architektur- und Sicherheitsdokumentation liegt unter `docs/`.
+Die strukturierte Phase-1-Abnahme liegt unter `docs/PHASE_1_ACCEPTANCE.md`, die Shared-Hosting-Anleitung unter `docs/DEPLOYMENT.md`.
